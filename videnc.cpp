@@ -94,15 +94,10 @@ void encode_out(ofstream & opfile, ifstream & ipfile, unsigned char *ImgBuf, IEn
         }
 	#endif
 	}
-
     cout << "Bits/pixel: " << std::setprecision(5) << iAllBytes * 8.0f / (Width * Height * Frames) << endl;
 
-    ipfile.close(); //close input and output files
-    //opfile.close(); //don't close for big ass z.out file with both views
+    ipfile.close(); //close input
 
-	#ifdef DUMPMV
-    ofsD.close();
-	#endif
 }
 
 //--------------------------------------------------------
@@ -115,7 +110,7 @@ int main(int argc,char **argv) {
     ifstream ifsInfile;
     ofstream ofsOutfile;
 
-    unsigned char *pcImgBuf, *pcImgBuf3, *pcImgBuf5, *pcBitstreamBuf, *pcBitstreamBuf3;
+    unsigned char *pcImgBuf, *pcImgBuf3, *pcBitstreamBuf, *pcBitstreamBuf3;
     float fQstep;
 
 	int iWidth, iHeight, iFrames;
@@ -148,7 +143,7 @@ int main(int argc,char **argv) {
         return -5;
     }
 
-	pcBitstreamBuf = new unsigned char[iFrameSize];
+	pcBitstreamBuf = new unsigned char[iFrameSize]; //not necessary for one z.out
     if (!pcBitstreamBuf) {
         cout << "Failed to create output buffer." << endl;
         return -6;
@@ -166,8 +161,6 @@ encode_out(ofsOutfile, ifsInfile, pcImgBuf, pEncoder, pcBitstreamBuf, fQstep, iF
 
 	//open input file for balloons3.yuv
 	openin(ifsInfile3, argv, 3);
-    //open output file for balloons3.yuv
-	openout(ofsOutfile3, argv, 4); //Don't need to open if making big ass z.out
 
 	pcImgBuf3 = new unsigned char[iFrameSize];
 
@@ -176,20 +169,18 @@ encode_out(ofsOutfile, ifsInfile, pcImgBuf, pEncoder, pcBitstreamBuf, fQstep, iF
 		return -5;
 	}
 
-	pcBitstreamBuf3 = new unsigned char[iFrameSize];
-    if (!pcBitstreamBuf3) {
-        cout << "Failed to create output buffer." << endl;
-        return -6;
-    }
+encode_out(ofsOutfile, ifsInfile3, pcImgBuf3, pEncoder3, pcBitstreamBuf, fQstep, iFrameSize, iWidth, iHeight, iFrames, ofsDump);
 
-encode_out(ofsOutfile3, ifsInfile3, pcImgBuf3, pEncoder3, pcBitstreamBuf, fQstep, iFrameSize, iWidth, iHeight, iFrames, ofsDump);
-
-	//ofsOutfile.close(); //in the case that only one z.out is used
+	ofsOutfile.close(); 
+	
+#ifdef DUMPMV
+    ofsDump.close();
+#endif
 
     delete pEncoder;
 	delete pEncoder3;
     delete pcImgBuf;
-	delete pcImgBuf;
+	delete pcImgBuf3;
     delete pcBitstreamBuf;
 
     return 0;
