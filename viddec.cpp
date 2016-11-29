@@ -20,60 +20,28 @@ using namespace std;
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <string>
 
 #include "codeclib.h"
-
-int iTotalBytes1=0;
-int iTotalBytes3=0;
 
 void usage() {
     cout << "Video decoder with motion est, Golomb-Rice code, and arithmetic code:" << endl;;
     cout << "Usage: viddec infile outfile" << endl;
     cout << "    infile:  Input compressed file." << endl;
-    cout << "    outfile: Output yuv file." << endl;
-}
-
-int openout(ofstream & opfile, char **arguv, int index){ //Function to open output files
-	//open output file
-    opfile.open(arguv[index], ios::out|ios::binary);
-    if(!opfile)
-    {
-        cout << "Can't open file " << arguv[index] << endl;
-        return -3;
-    }
-}
-
-void decode_out(ofstream & opfile, ifstream & ipfile, unsigned char *ImgBuf, IDecoder *pDec, unsigned char *pcBSB, float Qstep, int ImageArea, int TotalBytes, int Frames){
-
-    for (int i = 0; i < Frames; i++) {
-        cout << ".";
-
-        ipfile.read((char *)&TotalBytes, sizeof(int)); // Read size of input file to TotalBytes
-
-        ipfile.read((char *)pcBSB, TotalBytes); //read input file into Bitstream buffer with size of TotalBytes
-
-        int iUsedBytes = pDec->decodeImage(i == 0, pcBSB, Qstep);
-
-        pDec->GetImage(ImgBuf);
-    
-        opfile.write((const char *)ImgBuf, ImageArea);
-    }
-    cout << TotalBytes << endl;
-
-    cout << endl;	
-	opfile.close();
+    cout << "    outfile: Output yuv file1." << endl;
+	cout << "    outfile: Output yuv file2." << endl;
+	cout << "    outfile: Output yuv file3." << endl;
 }
 
 int main(int argc,char **argv) {
  
     ifstream ifsInfile;
-    ofstream ofsOutfile;
-
-    int iWidth, iHeight, iFrames;
-    unsigned char *pcImgBuf, *pcBitstreamBuf, *pcBitstreamBuf3;
+    ofstream ofsOutfile, ofsOutfile3, ofsOutfile5;
+    int nViews = 1, iWidth, iHeight, iTotalBytes, iFrames;
+    unsigned char *pcImgBuf, *pcBitstreamBuf;
     float fQstep;
 
-    if(argc < 3) {
+    if(argc < 5) {
         usage();
         return -1;
     }
@@ -86,9 +54,34 @@ int main(int argc,char **argv) {
         return -2;
     }
 
-	openout(ofsOutfile, argv, 2);
+    //open output file
+    ofsOutfile.open(argv[2], ios::out|ios::binary);
+    if(!ofsOutfile)
+    {
+        cout << "Can't open file " << argv[2] << endl;
+        return -3;
+    }
+	if (std::string(argv[3]) != "0") {
+		ofsOutfile3.open(argv[3], ios::out | ios::binary);
+		if (!ofsOutfile3)
+		{
+			cout << "Can't open file " << argv[2] << endl;
+			return -3;
+		}
+		nViews++;
+	}
+	if (std::string(argv[4]) != "0") {
+		ofsOutfile5.open(argv[4], ios::out | ios::binary);
+		if (!ofsOutfile5)
+		{
+			cout << "Can't open file " << argv[2] << endl;
+			return -3;
+		}
+		nViews++;
+	}
 
-    //read width, height, total bytes
+    //read numViews, width, height, total bytes
+	//ifsInfile.read((char *)&nViews, sizeof(int));
 	ifsInfile.read((char *)&iWidth, sizeof(int));
 	ifsInfile.read((char *)&iHeight, sizeof(int));
 	ifsInfile.read((char *)&iFrames, sizeof(int));
@@ -96,7 +89,6 @@ int main(int argc,char **argv) {
 
     int iImageArea = iWidth * iHeight * 3 / 2;
     pcImgBuf = new unsigned char[iImageArea];
-
     if (!pcImgBuf) {
         cout << "Fail to create image buffer." << endl;
         return -5;
@@ -109,30 +101,47 @@ int main(int argc,char **argv) {
     }
 
     IDecoder *pDecoder = new IDecoder(iWidth, iHeight);
+	//decoder routine
+    for (int i = 0; i < iFrames; i++) {
+		cout << "Decoding View 1..." << endl;
+        ifsInfile.read((char *)&iTotalBytes, sizeof(int));
+        ifsInfile.read((char *)pcBitstreamBuf, iTotalBytes);
 
-	decode_out(ofsOutfile, ifsInfile, pcImgBuf, pDecoder, pcBitstreamBuf, fQstep, iImageArea, iTotalBytes1, iFrames); //decode first view
+        int iUsedBytes = pDecoder->decodeImage(i == 0, pcBitstreamBuf, fQstep);
 
-	pcBitstreamBuf3 = new unsigned char[iImageArea];
-    if (!pcBitstreamBuf3) {
-        cout << "Fail to create output buffer." << endl;
-        return -7;
+        pDecoder->GetImage(pcImgBuf);    
+        ofsOutfile.write((const char *)pcImgBuf, iImageArea);
+
+		//decode additional views
+		if (nViews > 1) {
+			cout << "Decoding View 2..." << endl;
+			ifsInfile.read((char *)&iTotalBytes, sizeof(int));
+			ifsInfile.read((char *)pcBitstreamBuf, iTotalBytes);
+
+			int iUsedBytes = pDecoder->decodeImage(i == 0, pcBitstreamBuf, fQstep);
+
+			pDecoder->GetImage(pcImgBuf);
+			ofsOutfile3.write((const char *)pcImgBuf, iImageArea);
+			if (nViews > 2) {
+				cout << "Decoding View 3..." << endl;
+				ifsInfile.read((char *)&iTotalBytes, sizeof(int));
+				ifsInfile.read((char *)pcBitstreamBuf, iTotalBytes);
+
+				int iUsedBytes = pDecoder->decodeImage(i == 0, pcBitstreamBuf, fQstep);
+
+				pDecoder->GetImage(pcImgBuf);
+				ofsOutfile5.write((const char *)pcImgBuf, iImageArea);
+			}
+		}
     }
-
-	IDecoder *pDecoder3 = new IDecoder(iWidth, iHeight);
-
-	ofstream ofsOutfile3;
-
-	openout(ofsOutfile3, argv, 3);
-
-	decode_out(ofsOutfile3, ifsInfile, pcImgBuf, pDecoder, pcBitstreamBuf, fQstep, iImageArea, iTotalBytes3, iFrames);	//decode 2nd view   
+    cout << endl;
 
     ifsInfile.close();
+    ofsOutfile.close();
 
     delete pDecoder;
-	delete pDecoder3;
     delete pcImgBuf;
     delete pcBitstreamBuf;
-	delete pcBitstreamBuf3;
 
     return 0;
 }

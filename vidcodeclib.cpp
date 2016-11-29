@@ -510,39 +510,42 @@ void IEncoder::MBMotionEst(
     int y,
     int x)
 {
-    int i, j, iSAD0, iSAD;
-    int iMVy = 0, iMVx = 0;
+     int i=0, j=0; 
+	 int iSAD0, iSAD;
+     int iMVy = 0, iMVx = 0;
+     int stepsize = 4;
 
-    iSAD0 = GetSAD(pfCurrFrame, pfRefFrame, y, x, 0, 0, 65535);
-    
-    for (i = -18; i <= 18; i++) {
-       for (j = -18; j <= 18; j++) {
+    iSAD0 = GetSAD(pfCurrFrame, pfRefFrame , y, x, 0, 0, 65535);
 
-           //prevent MV from pointing to outside
-           if (y + i < 0 || y + i + MBSIZE - 1 >= (int) _h || x + j < 0 || x + j + MBSIZE - 1 >= (int) _w) {
-               continue;
-           }
+    while(stepsize >= 1) {
 
-           if (i == 0 && j == 0) {
-               continue;
-           }
+    for (int dx = -stepsize; dx <= stepsize; dx+= stepsize){ // scans through all 3 horizontal positions with coordinates ranging from x-stepsize to x+stepsize
+        for (int dy = -stepsize; dy<= stepsize; dy+= stepsize){ // scans through all 3 vertical positions with coordinates ranging from y-stepsize to y+stepsize
+		  
+		  if (y + i <0 || y + i + MBSIZE - 1 >= (int) _h  || x + j <0 || x + j + MBSIZE - 1 >= (int) _w){ //contain MV within frame boundaries
+			continue;
+		  }
 
-           //get SAD
-           iSAD = GetSAD(pfCurrFrame, pfRefFrame, y, x, i, j, iSAD0);
+		  j+=dx; // add on stepsize difference to indicate current scan position
+      i+=dy; 
 
-           //update min SAD
-           if (iSAD < iSAD0 * 0.925f) {  
-               iSAD0 = iSAD;
-               iMVy = i;
+          iSAD = GetSAD(pfCurrFrame, pfRefFrame, y, x, i, j, iSAD0); //check SAD for two blocks
+          if (iSAD < iSAD0 * 0.925f) {  // check if new SAD is significantly smaller than last recorded minimum
+               iSAD0 = iSAD; // update smallest SAD so far with current SAD value
+               iMVy = i; // update MVs with location of new best candidate
                iMVx = j;
-           }
+            }
+         }      
        }
+      stepsize = stepsize/2; // divide by 2 for next search
+	  i = iMVy; // take best candidate that was stored in MV values and use for next stepsize search
+	  j = iMVx; 
     }
 
-    m_iMVy[y / MBSIZE][x / MBSIZE] = iMVy;
+    m_iMVy[y / MBSIZE][x / MBSIZE] = iMVy; 
     m_iMVx[y / MBSIZE][x / MBSIZE] = iMVx;
-
 }
+
 
 //return the sum of absolute difference of two blocks with the given motion vectors
 int IEncoder::GetSAD(
